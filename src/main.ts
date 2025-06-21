@@ -1,10 +1,9 @@
 import './style.css';
 import { GeometrySimulator } from './geometry/GeometrySimulator';
-import { GeometryType } from './geometry/types';
+import { GeometryType, Tool } from './geometry/types';
 
 class App {
   private simulator: GeometrySimulator;
-  private currentGeometry: GeometryType = 'hyperbolic';
 
   constructor() {
     this.simulator = new GeometrySimulator();
@@ -13,7 +12,9 @@ class App {
 
   private init(): void {
     this.setupEventListeners();
-    this.updateGeometryDisplay();
+    this.setupKeyboardShortcuts();
+    this.updateUI();
+    this.startUIUpdateLoop();
   }
 
   private setupEventListeners(): void {
@@ -28,11 +29,12 @@ class App {
     });
 
     // Tool selection
-    const toolButtons = document.querySelectorAll('.controls button');
+    const toolButtons = document.querySelectorAll('.tool-btn');
     toolButtons.forEach(btn => {
       btn.addEventListener('click', (e) => {
         const target = e.currentTarget as HTMLElement;
-        this.selectTool(target.id);
+        const tool = target.dataset.tool as Tool;
+        this.selectTool(tool);
       });
     });
 
@@ -40,30 +42,89 @@ class App {
     const mainCanvas = document.getElementById('main-canvas') as HTMLCanvasElement;
     mainCanvas.addEventListener('click', (e) => this.handleCanvasClick(e));
     mainCanvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+    mainCanvas.addEventListener('mouseup', () => this.simulator.handleMouseUp());
+    mainCanvas.addEventListener('mouseleave', () => this.simulator.handleMouseUp());
+
+    // Prevent context menu on canvas
+    mainCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // Handle window resize
+    window.addEventListener('resize', () => this.handleResize());
+  }
+
+  private setupKeyboardShortcuts(): void {
+    document.addEventListener('keydown', (e) => {
+      // Prevent shortcuts when typing in input fields
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      switch (e.key.toLowerCase()) {
+        case 'p':
+          this.selectTool('add_point');
+          break;
+        case 'l':
+          this.selectTool('draw_line');
+          break;
+        case 'c':
+          this.selectTool('draw_circle');
+          break;
+        case 'm':
+          this.selectTool('move');
+          break;
+        case 'x':
+        case 'delete':
+          this.selectTool('clear');
+          break;
+        case '1':
+          this.selectGeometry('spherical');
+          break;
+        case '2':
+          this.selectGeometry('euclidean');
+          break;
+        case '3':
+          this.selectGeometry('hyperbolic');
+          break;
+        case 'escape':
+          // Cancel current operation
+          this.simulator.setTool(this.simulator.getCurrentTool());
+          break;
+      }
+    });
   }
 
   private selectGeometry(geometry: GeometryType): void {
-    this.currentGeometry = geometry;
-    
-    // Update button states
+    // Update button states with smooth transition
     document.querySelectorAll('.geometry-btn').forEach(btn => {
       btn.classList.remove('active');
     });
-    document.querySelector(`[data-geometry="${geometry}"]`)?.classList.add('active');
     
+    const selectedBtn = document.querySelector(`[data-geometry="${geometry}"]`);
+    selectedBtn?.classList.add('active');
+    
+    // Update simulator
     this.simulator.setGeometry(geometry);
-    this.updateGeometryDisplay();
+    this.updateUI();
+    
+    // Update preview description
+    this.updatePreviewDescription(geometry);
   }
 
-  private selectTool(toolId: string): void {
+  private selectTool(tool: Tool): void {
     // Update button states
-    document.querySelectorAll('.controls button').forEach(btn => {
+    document.querySelectorAll('.tool-btn').forEach(btn => {
       btn.classList.remove('active');
     });
-    document.getElementById(toolId)?.classList.add('active');
     
-    const tool = toolId.replace('-btn', '').replace('-', '_');
-    this.simulator.setTool(tool as any);
+    const selectedBtn = document.querySelector(`[data-tool="${tool}"]`);
+    selectedBtn?.classList.add('active');
+    
+    // Update simulator
+    this.simulator.setTool(tool);
+    this.updateUI();
+    
+    // Update canvas cursor
+    this.updateCanvasCursor(tool);
   }
 
   private handleCanvasClick(e: MouseEvent): void {
@@ -73,6 +134,7 @@ class App {
     const y = e.clientY - rect.top;
     
     this.simulator.handleClick(x, y);
+    this.updateUI();
   }
 
   private handleMouseMove(e: MouseEvent): void {
@@ -82,26 +144,90 @@ class App {
     const y = e.clientY - rect.top;
     
     this.simulator.handleMouseMove(x, y);
-    
-    // Update mouse info
-    const mouseInfo = document.getElementById('mouse-info');
-    if (mouseInfo) {
-      mouseInfo.textContent = `Mouse: (${Math.round(x)}, ${Math.round(y)})`;
+  }
+
+  private handleResize(): void {
+    // Debounce resize events
+    clearTimeout((this as any).resizeTimeout);
+    (this as any).resizeTimeout = setTimeout(() => {
+      // Could implement canvas resizing here if needed
+      this.updateUI();
+    }, 250);
+  }
+
+  private updateUI(): void {
+    this.updateGeometryInfo();
+    this.updateToolInfo();
+    this.updateObjectCount();
+  }
+
+  private updateGeometryInfo(): void {
+    const geometryInfo = document.getElementById('geometry-info');
+    if (geometryInfo) {
+      geometryInfo.textContent = this.simulator.getCurrentGeometry().charAt(0).toUpperCase() + 
+                                this.simulator.getCurrentGeometry().slice(1);
     }
   }
 
-  private updateGeometryDisplay(): void {
-    const geometryInfo = document.getElementById('geometry-info');
-    if (geometryInfo) {
-      const names = {
-        euclidean: 'Euclidean Geometry',
-        spherical: 'Spherical Geometry', 
-        hyperbolic: 'Hyperbolic Geometry'
+  private updateToolInfo(): void {
+    const toolInfo = document.getElementById('tool-info');
+    if (toolInfo) {
+      const toolNames = {
+        add_point: 'Point',
+        draw_line: 'Line',
+        draw_circle: 'Circle',
+        move: 'Move',
+        clear: 'Clear'
       };
-      geometryInfo.textContent = `Current: ${names[this.currentGeometry]}`;
+      toolInfo.textContent = toolNames[this.simulator.getCurrentTool()];
     }
+  }
+
+  private updateObjectCount(): void {
+    const objectCount = document.getElementById('object-count');
+    if (objectCount) {
+      const counts = this.simulator.getObjectCounts();
+      objectCount.textContent = `${counts.points} points, ${counts.lines} lines, ${counts.circles} circles`;
+    }
+  }
+
+  private updatePreviewDescription(geometry: GeometryType): void {
+    const previewDescription = document.getElementById('preview-description');
+    if (previewDescription) {
+      const descriptions = {
+        euclidean: 'Flat geometry - exactly one parallel line through any external point',
+        spherical: 'Curved geometry - no parallel lines exist, all lines eventually meet',
+        hyperbolic: 'Saddle-shaped geometry - infinite parallel lines through any external point'
+      };
+      previewDescription.textContent = descriptions[geometry];
+    }
+  }
+
+  private updateCanvasCursor(tool: Tool): void {
+    const canvas = document.getElementById('main-canvas') as HTMLCanvasElement;
+    if (canvas) {
+      const cursors = {
+        add_point: 'crosshair',
+        draw_line: 'crosshair',
+        draw_circle: 'crosshair',
+        move: 'grab',
+        clear: 'pointer'
+      };
+      canvas.style.cursor = cursors[tool];
+    }
+  }
+
+  private startUIUpdateLoop(): void {
+    // Update UI periodically for dynamic content
+    setInterval(() => {
+      this.updateObjectCount();
+    }, 100);
   }
 }
 
-// Initialize the app
-new App();
+// Initialize the app when DOM is loaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => new App());
+} else {
+  new App();
+}
