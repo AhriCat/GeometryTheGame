@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Geometry - The Game</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="header">
+        <h1 class="title">Geometry</h1>
+        <p class="subtitle">the game</p>
+      </header>
+      
+      <div class="rules">
+        <h2>RULES</h2>
+        <ol>
+          <li>If you have 2 points, you can draw a straight line between them.</li>
+          <li>If you have a straight line, you can extend it continuously without bounds.</li>
+          <li>Given a center and a radius, you can draw a circle.</li>
+          <li>All right angles are equal to each other.</li>
+        </ol>
+      </div>
+
+      <div class="world-selector">
+        <h2>select world</h2>
+        <div class="geometry-options">
+          <button class="geometry-btn" data-geometry="euclidean">
+            <span class="geometry-label">NO PARALLEL LINES</span>
+            <span class="geometry-sublabel">Spherical Geometry</span>
+          </button>
+          <button class="geometry-btn" data-geometry="spherical">
+            <span class="geometry-label">1 PARALLEL LINE</span>
+            <span class="geometry-sublabel">Euclidean Geometry</span>
+          </button>
+          <button class="geometry-btn active" data-geometry="hyperbolic">
+            <span class="geometry-label">&gt;1 PARALLEL LINE</span>
+            <span class="geometry-sublabel">Hyperbolic Geometry</span>
+          </button>
+        </div>
+        <div class="geometry-visual">
+          <canvas id="preview-canvas" width="300" height="200"></canvas>
+        </div>
+      </div>
+
+      <div class="simulator">
+        <div class="controls">
+          <button id="clear-btn">Clear</button>
+          <button id="add-point-btn" class="active">Add Point</button>
+          <button id="draw-line-btn">Draw Line</button>
+          <button id="draw-circle-btn">Draw Circle</button>
+          <button id="move-btn">Move</button>
+        </div>
+        <canvas id="main-canvas" width="800" height="600"></canvas>
+        <div class="info">
+          <p id="geometry-info">Current: Hyperbolic Geometry</p>
+          <p id="mouse-info">Click to add points, select two points to draw lines</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
